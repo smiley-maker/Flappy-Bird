@@ -74,8 +74,10 @@ class Bird:
         elif self.img_count < self.ANIMATION_TIME*3:
             self.img = self.IMGS[2]
         elif self.img_count < self.ANIMATION_TIME*4:
-            self.img = self.IMGS[1]
-        elif self.img_count == self.ANIMATION_TIME*4 + 1:
+            self.img = self.IMGS[3]
+        elif self.img_count < self.ANIMATION_TIME*5:
+            self.img = self.IMGS[0]
+        elif self.img_count == self.ANIMATION_TIME*5 + 1:
             self.img = self.IMGS[0]
             self.img_count = 0
         
@@ -187,7 +189,7 @@ def main():
     clock = pygame.time.Clock()
 
     bird = Bird(230, 350)
-    base = Clouds(650)
+    base = Clouds(610)
     pipes = [Pipe(600)]
 
     score = 0
