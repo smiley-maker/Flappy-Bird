@@ -1,7 +1,7 @@
 import pygame
 import neat
-import time
 import os
+import pickle
 import random
 pygame.font.init()
 
@@ -10,7 +10,6 @@ WIN_WIDTH = 500
 WIN_HEIGHT = 700
 
 #Load images
-#pygame.transform.scale2x(pygame.image.load(os.path.join("assets", "bird1.jpg")))
 BIRD_IMGS = [pygame.image.load(os.path.join("assets", "flappy bird 1.png")), pygame.image.load(os.path.join("assets", "flappy bird 2.png")), pygame.image.load(os.path.join("assets", "flappy bird 3.png")), pygame.image.load(os.path.join("assets", "flappy bird 4.png"))]
 PIPE = pygame.image.load(os.path.join("assets", "pipe.png"))
 BACKGROUND = pygame.image.load(os.path.join("assets", "background.png"))
@@ -170,17 +169,19 @@ class Clouds:
         win.blit(self.IMG, (self.x2, self.y))
 
 
-def draw_window(win, bird, pipes, clouds, score):
+def draw_window(win, birds, pipes, clouds, score):
     win.blit(BACKGROUND, (0,0)) #Draws background
     
     for pipe in pipes:
         pipe.draw(win)
     
+    for bird in birds:
+        bird.draw(win)
+    
     text = STAT_FONT.render("Score: " + str(score), 1, (255,255,255))
     win.blit(text, (WIN_WIDTH-10-text.get_width(), 10))
     
     clouds.draw(win)
-    bird.draw(win)
     pygame.display.update()
 
 
@@ -193,8 +194,9 @@ def main(genomes, config):
     ge = []
     birds = []
 
-    for g in genomes:
-        net = neat.nn.FeedForwardNetwork(g, config)
+    #genomes -> (1, genome)
+    for _, g in genomes:
+        net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
         birds.append(Bird(200, 300))
         g.fitness = 0
@@ -212,12 +214,24 @@ def main(genomes, config):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
+                pygame.quit()
         
 
         pipe_ind = 0
         if len(birds) > 0:
             if len(pipes) > 1 and birds[0].x > pipes[0].x + pipes[0].PIPE_TOP.get_width():
                 pipe_ind = 1
+        else:
+            run = False
+            break
+        
+        for x, bird in enumerate(birds):
+            bird.move()
+            ge[x].fitness += 0.1 #little bit of fitness for getting this far, 1 fitness point for every second surviving
+
+            output = nets[x].activate((bird.y, abs(bird.y - pipes[pipe_ind].height), abs(bird.y - pipes[pipe_ind].bottom)))
+            if output[0] > 0.5:
+                bird.jump()
         
 #        bird.move()
         rem = []
@@ -250,24 +264,24 @@ def main(genomes, config):
             pipes.remove(r)
         
         for x, bird in enumerate(birds):
-            if bird.y + bird.img.get_height() > 730:
+            if bird.y + bird.img.get_height() > 730 or bird.y < 0:
                 birds.pop(x)
                 nets.pop(x)
                 ge.pop(x)
 
         base.move()
-        draw_window(win, bird, pipes, base, score)
-        
-    pygame.quit()            
+        draw_window(win, birds, pipes, base, score)
 
 
-main()
-#print(pygame.font.get_fonts())
+        if score > 200: 
+            pickle.dump(nets[0], open("best_model.pkl", "wb"))
+            break
 
-def run(config_path):
-    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction, 
+
+def run(config_file):
+    config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
                          neat.DefaultSpeciesSet, neat.DefaultStagnation,
-                         config_path)
+                         config_file)
 
     p = neat.Population(config)
 
@@ -275,8 +289,8 @@ def run(config_path):
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
 
-    winner = p.run(main(),50)
-
+    winner = p.run(main,50)
+    print('\nBest genome:\n{!s}'.format(winner))
 
 if __name__ == "__main__":
     local_dir = os.path.dirname(__file__) #Current directory path
